@@ -24,7 +24,7 @@ describe('effect path', () => {
     effect(() => {
       console.log(obj.age)
     }, {
-      scheduler: () => {
+      scheduler() {
         currentAge = obj.age
       }
     })
@@ -44,6 +44,7 @@ describe('effect path', () => {
 
   })
 
+  // 三则运算符 读取时 合理出发响应式
   it('shoudler read key', () => {
     let bodyText = ''
     let resultcount = 0
@@ -60,6 +61,11 @@ describe('effect path', () => {
 
     expect(resultcount).toBe(2)
 
+  })
+
+  // computed
+  it('shoudler complier computed', () => {
+    
   })
 
 })

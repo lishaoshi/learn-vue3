@@ -17,7 +17,6 @@ function reactive(raw) {
   })
 }
 
-
 export {
   reactive
 }
