@@ -1,33 +1,55 @@
+import { extend, isArray } from '../shared/index'
+import {
+  createDep,
+  Dep
+} from './dep'
+
 // 全局变量
 // 当前正在观察的响应副作用函数
 let activeEffeact
 
 // 封装effect 用于收集依赖
-class ReactiveEffect {
- constructor(public fn, public options) {
+export class ReactiveEffect {
+  deps: Dep[] = []
+ constructor(public fn, public scheduler?) {
 
+ }
+
+ run() {
+  clearEffectFn(this)
+
+  activeEffeact = this as any
+
+  const result = this.fn()
+
+  activeEffeact = undefined
+
+  return result
  }
 }
 
 function effect(fn: Function, options = {}) {
-  const effectFn = () => {
-    clearEffectFn(effectFn)
-    // 当前收集的依赖
-    activeEffeact = effectFn
+  // const effectFn = () => {
+  //   clearEffectFn(effectFn)
+  //   // 当前收集的依赖
+  //   activeEffeact = effectFn
 
-    fn()
+  //   fn()
 
-    activeEffeact = undefined
-  }
+  //   activeEffeact = undefined
+  // }
+
+  const effectFn = new ReactiveEffect(fn)
   // 将options挂在在 封装后函数的属性 options中，在trigger中，从依赖桶中读取依赖函数时，可以拿到options
-  effectFn.options = options
+  // effectFn.options = options
+  extend(effectFn, options)
 
   // 将当前effectFn的所有相关依赖绑定到deps中
-  effectFn.deps = []
+  // effectFn.deps = []
 
   
 
-  effectFn()
+  effectFn.run()
 }
 
 // 执行副作用钱  清除当前执行副作用的所有依赖
@@ -66,17 +88,27 @@ function trigger(target, key) {
 
   const deps = depsMap.get(key)
 
-  const effectFnToRuns = new Set<any>(deps)
-  effectFnToRuns.forEach(fn => {
-    if (fn !== activeEffeact) {
-      if (fn.options.scheduler) {
-        fn.options.scheduler()
-      } else {
-        fn()
-      }
-    } 
-    
-  });
+  const effectFnToRuns = createDep(deps)
+
+  triggerEffects(effectFnToRuns)
+}
+
+
+function triggerEffects(dep: Dep | ReactiveEffect[]) {
+  const effects = isArray(dep) ? dep : [...dep]
+  for (const effect of effects) {
+    triggerEffect(effect)
+  }
+}
+
+function triggerEffect(effect: ReactiveEffect) {
+  if (effect !== activeEffeact) {
+    if (effect.scheduler) {
+      effect.scheduler()
+    } else {
+      effect.run()
+    }
+  }
 }
 
 export {
