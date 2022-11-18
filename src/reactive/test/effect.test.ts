@@ -1,4 +1,4 @@
-import { effect } from '../effect'
+import { effect, stop, ReactiveEffectRunner } from '../effect'
 import { reactive } from '../reactive'
 
 describe('effect path', () => {
@@ -61,6 +61,73 @@ describe('effect path', () => {
 
     expect(resultcount).toBe(2)
 
+  })
+
+  // 测试effect 嵌套
+  it('effect 嵌套', () => {
+    let cName
+    let cAge
+    const info = reactive({
+      name: 'liss',
+      age: 25
+    })
+
+    effect(() => {
+      console.log('外层effect')
+      effect(() => {
+        console.log('内嵌套')
+        cAge = info.age
+      })
+      cName = info.name
+    })
+    info.age = 18
+
+  })
+
+  // stop
+  it('stop', () => {
+    let dummy
+    const obj = reactive({ prop: 1 })
+    const runner: ReactiveEffectRunner = effect(() => {
+      dummy = obj.prop
+    })
+
+    obj.prop = 2
+
+    expect(dummy).toBe(2)
+    stop(runner)
+
+    obj.prop = 3
+
+    expect(dummy).toBe(2)
+    runner()
+    expect(dummy).toBe(3)
+  })
+
+  it('events: onStop', () => {
+    const onStop = jest.fn()
+
+    const runner = effect(() => {}, {
+      onStop
+    })
+
+    stop(runner)
+
+    expect(onStop).toHaveBeenCalled()
+  })
+// stop 后再执行runner  将不再响应
+  it('should stoped for runner call not observe', () => {
+    const obj = reactive({prop: 0})
+    let dummy
+    const runner = effect(() => {
+      dummy = obj.prop
+    })
+
+    stop(runner)
+
+    obj.prop++
+
+    expect(dummy).not.toBe(obj.prop)
   })
 
   // computed

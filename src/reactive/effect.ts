@@ -8,62 +8,84 @@ import {
 // 当前正在观察的响应副作用函数
 let activeEffeact
 
+let effectStack: any = []
+
+
 // 封装effect 用于收集依赖
 export class ReactiveEffect {
+  active: Boolean = true
   deps: Dep[] = []
+  onStop?: () => void
  constructor(public fn, public scheduler?) {
 
  }
 
  run() {
-  clearEffectFn(this)
+
+  effectStack.push(this)
+  cleanupEffect(this)
 
   activeEffeact = this as any
 
   const result = this.fn()
+  effectStack.pop()
 
-  activeEffeact = undefined
+  activeEffeact = effectStack[effectStack.length - 1]
 
   return result
+ }
+
+ stop() {
+  if (this.active) {
+    cleanupEffect(this)
+    if (this.onStop) {
+      this.onStop()
+    }
+    this.active = false
+  }
  }
 }
 
 function effect(fn: Function, options = {}) {
-  // const effectFn = () => {
-  //   clearEffectFn(effectFn)
-  //   // 当前收集的依赖
-  //   activeEffeact = effectFn
 
-  //   fn()
-
-  //   activeEffeact = undefined
-  // }
-
-  const effectFn = new ReactiveEffect(fn)
+  const effect = new ReactiveEffect(fn)
   // 将options挂在在 封装后函数的属性 options中，在trigger中，从依赖桶中读取依赖函数时，可以拿到options
   // effectFn.options = options
-  extend(effectFn, options)
+  extend(effect, options)
 
   // 将当前effectFn的所有相关依赖绑定到deps中
   // effectFn.deps = []
 
-  
+  effect.run()
+  // effect 返回副作用函数  提供可主动触发副作用函数 可自定义执行副作用时机
+  const runner = (effect.run.bind(effect)) as ReactiveEffectRunner
+  runner.effect = effect
+  return runner
+}
 
-  effectFn.run()
+// stop reactivety
+export function stop(runner: ReactiveEffectRunner) {
+  runner.effect.stop()
+}
+
+export interface ReactiveEffectRunner<T = any> {
+  (): T
+  effect: ReactiveEffect
 }
 
 // 执行副作用钱  清除当前执行副作用的所有依赖
-function clearEffectFn(effectFn) {
-  for(let i = 0; i < effectFn.deps?.length; i++) {
-    const deps: Set<any> = effectFn.deps[i]
-    deps.delete(effectFn)
+function cleanupEffect(effect: ReactiveEffect) {
+  for(let i = 0; i < effect.deps?.length; i++) {
+    const deps: Set<any> = effect.deps[i]
+    deps.delete(effect)
   }
-  effectFn.deps.length = 0
+  effect.deps.length = 0
 }
 
 const targetMap = new WeakMap()
 // 收集响应式依赖
 function track(target, key) {
+  if(!activeEffeact) return
   let depsMap = targetMap.get(target)
   if (!depsMap) {
     depsMap = new Map()
